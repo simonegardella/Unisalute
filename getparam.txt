@@ -1,0 +1,26 @@
+   function getParam (s as string, Param as String, separator as String) as String
+        REM Funzione Scritta da SIMONE GARDELLA - ELOCAL GROUP SRL
+        REM La funzione consente di estrarre da una lista di parametri passati in GET/POST uno specifico attributo
+        dim ret as String
+        dim fullstring as String
+        dim firstpos as Integer
+        ret = ""
+        fullstring = s + separator
+        firstpos = instr (fullstring,separator)
+        
+        do while firstpos> 0
+            if left (fullstring,len(Param)) = Param Then
+                ret = left (fullstring, instr(fullstring,separator))
+                ret =right(ret, len(ret)-len(Param)-1)
+                ret = left (ret,len(ret)-1)
+                
+            end if
+            fullstring = mid (fullstring,firstpos+len(separator),len(fullstring))
+            firstpos = instr (fullstring,separator)
+    
+        loop 
+        
+        return ret
+        
+    end function
+
