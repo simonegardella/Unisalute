@@ -1,0 +1,87 @@
+Option Public
+Option Declare
+
+Sub Initialize
+    On Error GoTo ErrorHandler
+    
+    Dim session As New NotesSession
+    Dim db As NotesDatabase
+    Dim doc As NotesDocument
+    Dim docId As String
+    Dim json As String
+
+    ' Ottiene il database corrente
+    Set db = session.CurrentDatabase
+
+    ' Recupera l'identificativo del documento dalla query string
+    docId = session.DocumentContext.GetFirstItem("docId").Text
+
+    If docId = "" Then
+        Print "Status: 400"
+        Print "Content-Type: text/plain"
+        Print "Errore: parametro 'docId' mancante."
+        Exit Sub
+    End If
+
+    ' Recupera il documento dal database
+    Set doc = db.GetDocumentByUNID(docId)
+    If doc Is Nothing Then
+        Print "Status: 404"
+        Print "Content-Type: text/plain"
+        Print "Errore: documento non trovato."
+        Exit Sub
+    End If
+
+    ' Serializza il documento in JSON
+    json = SerializeDocumentToJson(doc)
+
+    ' Imposta l'output HTTP
+    Print "Content-Type: application/json"
+    Print "Status: 200"
+    Print json
+    Exit Sub
+
+ErrorHandler:
+    Print "Status: 500"
+    Print "Content-Type: text/plain"
+    Print "Errore interno: " & Error$
+End Sub
+
+' Funzione per serializzare un documento in JSON
+Function SerializeDocumentToJson(doc As NotesDocument) As String
+    Dim json As String
+    Dim item As NotesItem
+    Dim value As Variant
+    Dim i As Integer
+
+    json = "{"
+    
+    ' Itera attraverso tutti gli elementi del documento
+    ForAll item In doc.Items
+        value = item.Values
+        json = json & """" & item.Name & """: "
+
+        ' Gestisce valori multipli o singoli
+        If IsArray(value) Then
+            json = json & "["
+            For i = LBound(value) To UBound(value)
+                json = json & """" & CStr(value(i)) & """"
+                If i < UBound(value) Then json = json & ", "
+            Next
+            json = json & "]"
+        Else
+            json = json & """" & CStr(value) & """"
+        End If
+        
+        json = json & ", "
+    End ForAll
+
+    ' Rimuove l'ultima virgola e spazio
+    If Right(json, 2) = ", " Then
+        json = Left(json, Len(json) - 2)
+    End If
+
+    json = json & "}"
+    SerializeDocumentToJson = json
+End Function
+

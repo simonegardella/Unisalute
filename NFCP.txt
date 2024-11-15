@@ -1,0 +1,213 @@
+Option Public
+Option Declare
+ 
+%REM 
+Version  1.2
+Date     13/11/2024
+Authors  N. Strino, F. Bologna, S. Gardella
+Aggiunti i Parametri
+UserName                                       per làutente
+UserPassword                               per la password
+%ENDREM
+ 
+Use "UtilDocument"
+Use "CommonAgent"
+Dim s As NotesSession
+Dim m_dbCur As NotesDatabase
+Dim m_docCtx As NotesDocument
+Dim m_sQuery As String
+Dim m_myList List As String
+Dim m_sFunCod As String
+Dim m_iEvtCod As Integer
+Dim m_sEvtDes As String
+Sub Initialize
+ 
+      On Error GoTo HE
+      Dim sModNam As String
+      sModNam = "Initialize"
+     
+      m_sFunCod = "FCP"
+     
+      'Print "Apertura agente SRR"
+     
+      Dim names As NotesDatabase
+      Dim wkf As NotesDatabase
+      Dim upm21 As NotesDatabase
+      Dim vwkf As NotesView
+      Dim vNames As NotesView
+      Dim vUPM21 As NotesView
+      Dim dwkf As NotesDocument
+      Dim DATDB As String
+      Dim NAMDB As String
+      Dim docPersona As NotesDocument
+      Dim docUPM21 As NotesDocument
+      Dim abbreviate As Variant
+     
+      Print "Content-Type:text/html"
+     
+      Set s=New NotesSession
+      Set m_dbCur = s.currentdatabase
+      Set m_docCtx = s.documentcontext
+      Set wkf = s.Currentdatabase
+ 
+      Set vwkf = wkf.getview("SettingsDatabase")
+     
+      Set dwkf = vwkf.getfirstdocument
+ 
+      While Not dwkf Is Nothing
+            If dwkf.dbcode(0)="DAT" Then
+                  DATDB = dwkf.dbpath(0) & dwkf.dbfile(0)
+                  Set upm21 =s.getdatabase("",DATDB)      
+            End If
+            If dwkf.dbcode(0)="NAM" Then
+                  NAMDB = dwkf.dbpath(0) & dwkf.dbfile(0)
+                  Set names =s.getdatabase("",NAMDB)      
+                  
+            End If
+ 
+            Set dwkf = vwkf.getnextdocument(dwkf)
+      Wend
+     
+      If names Is Nothing Then
+            Print "2 - DATABASE Names Non trovato"
+            Exit Sub
+      End If
+ 
+      If UPM21 Is Nothing Then
+            Print "2 - DATABASE DAT Non trovato"
+            Exit Sub
+      End If
+ 
+      Set vNames = names.getview ("($NamesFieldLookup)")
+     
+      
+      
+      'Set vUPM21 = UPM21.getview("")
+ 
+      'm_sQuery= m_docCtx.Query_String(0)
+      'm_sQuery = Right(m_sQuery, Len(m_sQuery) - 10)
+     
+      'POST METHOD
+      If Len(m_docCtx.Request_Content(0)) > 0 Then
+            m_sQuery = URLDecode(m_docCtx.Request_Content(0))
+      Else
+            'GET METHOD
+            m_sQuery = m_docCtx.Query_String(0)
+      End If           
+      
+      'MsgBox "FCP invocato qs:"  & M_SqUERY
+     
+ 
+      'MsgBox "Ricerca di " & getparam (m_sQuery)
+     
+      
+      
+      Set docPersona = vNames.GetDocumentbykey(newgetparam (m_sQuery,"UserName","&"),True)
+     
+      If docPersona Is Nothing Then
+            Print "2-Documento persona non trovato"
+            'MsgBox "FCP Documento persona non trovato"
+            Exit Sub
+      Else
+ 
+            abbreviate = docPersona.Owner(0)
+            abbreviate = Evaluate ("@replacesubstring(""" + abbreviate +""";""CN="":""O="":""/C=IT"";"""":"""":"""")")
+            abbreviate = abbreviate(0)
+ 
+                      docPersona.HTTPPassword = newgetparam (m_sQuery,"UserPassword","&")           
+                      Call docPersona.ComputeWithForm(False,False)
+                      
+            docPersona.save True, False
+      End If
+     
+      
+      
+      Set vUPM21 = upm21.getview("LoginUser")
+      Set docupm21 = vUPM21.GetDocumentbykey(abbreviate,True)
+     
+      If docupm21 Is Nothing Then
+            Print "2-Documento persona UPM21 non trovato"
+            'MsgBox "FCP Documento persona UPM21 non trovato"
+            Exit Sub
+      Else
+            docUPM21.PStatus="BL"
+                      'docupm21.HTTPPassword =newgetparam (m_sQuery,"UserPassword","&") 
+            'Call docupm21.ComputeWithForm(False,False)
+            docupm21.save True, False
+      End If
+     
+      
+      'MsgBox "FCP FINE ESECUZIONE"
+      Print "0"
+      Exit Sub
+     
+HE:
+      m_iEvtCod = 3
+      m_sEvtDes = Erl & "-" & sModNam & "-" & CStr(Err) & "-" &  Error
+      Print m_iEvtCod & "-" & m_sEvtDes
+      Exit Sub
+     
+End Sub
+ 
+Sub Terminate
+     
+      Set m_docCtx = Nothing
+      Set m_dbCur = Nothing
+      Set s = Nothing
+     
+End Sub
+   Function newgetParam (s As String, Param As String, separator As String) As String
+        REM Funzione Scritta da SIMONE GARDELLA - ELOCAL GROUP SRL
+        REM La funzione consente di estrarre da una lista di parametri passati in GET/POST uno specifico attributo
+        Dim ret As String
+        Dim fullstring As String
+        Dim firstpos As Integer
+        ret = ""
+        fullstring = s + separator
+        firstpos = InStr (fullstring,separator)
+       
+        Do While firstpos> 0
+            If Left (fullstring,Len(Param)) = Param Then
+                ret = Left (fullstring, InStr(fullstring,separator))
+                ret =Right(ret, Len(ret)-len(Param)-1)
+                ret = Left (ret,Len(ret)-1)
+               
+            End If
+            fullstring = Mid (fullstring,firstpos+len(separator),Len(fullstring))
+            firstpos = InStr (fullstring,separator)
+   
+        Loop
+        
+                   newgetParam = ret
+      
+    End Function
+%REM
+      Function getparam
+      Description: Comments for Function
+%END REM
+Function getparam (s As String) As String
+      On Error GoTo HE
+      Dim inizio As Integer
+      Dim fine As Integer
+      Dim risposta As String
+      Dim m_sEvtDes As String
+ 
+      inizio = InStr (s, "UserID=")
+      fine = InStr (s & "&" , "&")
+     
+      If inizio >0 Then
+     
+            risposta = Mid (s, inizio+7, fine)
+      Else
+            risposta = ""
+      End If
+     
+      getparam = risposta
+      Exit Function
+     
+HE:
+      m_iEvtCod = 3
+      m_sEvtDes = Erl & "-" & "GETPARAM" & "-" & CStr(Err) & "-" &  Error
+      Print m_iEvtCod & "-" & m_sEvtDes
+      Exit Function
+End Function
